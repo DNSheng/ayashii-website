@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+
+<!--This is a template for how a series page should be -->
+
+<html>
+	<head>
+		<title>Ayashii</title>
+  		<meta charset="UTF-8">
+		<link rel="shortcut icon" href="images/favicon.ico"/>
+
+		<!--BEGINNING OF CSS-->
+		<!--Video-->
+		<link rel="stylesheet" type="text/css" href="css/libjass.css">
+		<link rel="stylesheet" type="text/css" href="css/videojs.ass.css">
+		<link rel="stylesheet" type="text/css" href="css/video-js.min.css">
+		<!--Navigation-->
+		<link rel="stylesheet" type="text/css" href="css/slick/slick.css">
+		<link rel="stylesheet" type="text/css" href="css/slick/slick-theme.css">
+		<!--Fonts-->
+		<link rel="stylesheet" type="text/css" href="css/font-awesome-4.7.0/css/font-awesome.min.css">
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Exo:100,200,400|Source+Sans+Pro:300,400,700">
+		<!--Mine-->
+		<link rel="stylesheet" type="text/css" href="css/style.css">
+
+
+		<!--BEGINNING OF JS-->
+		<!--JQuery-->
+		<script type "text/javascript" src="js/libs/jquery-3.2.1.min.js"></script>
+		<!--Mine-->
+		<script type="text/javascript" src="js/ayashii/login.js"></script>
+		<script type="text/javascript" src="js/ayashii/dropdown.js"></script>
+		<script type="text/javascript" src="js/navigator.js"></script>
+		<!--Video-->
+		<script type "text/javascript" src="js/libs/libjass.js"></script>
+		<script type "text/javascript" src="js/libs/video.min.js"></script>
+		<script type "text/javascript" src="js/libs/videojs.ass.js"></script>
+		<!--Navigation-->
+		<script type "text/javascript" src="js/slick/slick.min.js"></script>
+	</head>
+
+	<body oncontextmenu="return false">
+		<script>redirect();</script>
+		<div class="body"></div>
+		<div class="grad"></div>
+		<br>
+		<div class="s_boxcontainer">
+			<div class="title_box">
+				Title1<span>Title2</span>
+				<div class="random" onclick="home();">
+					Return
+				</div>
+			</div>
+			<div class="boxblur">
+				<div class="vidcontainer">
+					<video class="video-js vjs-default-skin vjs-big-play-centered" id="main_vid" style="outline: none;">
+						Your browser is not worthy.
+					</video>
+				</div>
+				<!--START OF DROPDOWN EPISODE NAVIGATOR-->
+				<div class="dropdown_box">
+					<div class="chevron">
+						<i class="fa fa-chevron-down fa-2x"></i>
+					</div>
+					<div class="content">
+						<!--START OF HORIZONTAL NAVIGATOR-->
+						<!--edit-->
+						<!--END OF HORIZONTAL NAVIGATOR-->
+					</div>
+				</div>
+				<!--END OF DROPDOWN EPISODE NAVIGATOR-->
+			</div>
+		</div>
+		<script>
+		// Init videojs player
+		videojs('main_vid', {
+			controls: true,
+			width: 1024,
+			height: 576,
+			poster: 'media/img.jpg'
+		});
+		// Load first video
+		videojs('main_vid').src({type: 'video/webm', src: 'media/video.mkv'});
+		</script>
+	</body>
+</html>

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+series -s 95 -w "Detroit Metal " -p "City" "/home/pi/Storage/Videos/Detroit Metal City/" dmc
+series -w "Blend "  -p "S" "/home/pi/Storage/Videos/Blend S/" blend
+series -e "13-" -w "Gochuumon wa " -p "Usagi desu ka?" "/home/pi/Storage/Videos/Gochuumon wa Usagi desu Ka/" gochuu
+series -e "1-12 25-" -w "Gochuumon wa " -p "Usagi desu ka?? " "/home/pi/Storage/Videos/Gochuumon wa Usagi desu Ka/" gochuu2
+series -w "Konohana " -p "Kitan" "/home/pi/Storage/Videos/Konohana Kitan/" konohana
+series -e "26" -s 62 -w "Little Witch " -p "Academia" "/home/pi/Storage/Videos/Little Witch Academia/" lwa
+series -w "Princess " -p "Principal" "/home/pi/Storage/Videos/Princess Principal/" pripal
+series -e "13-" -w "Tamako " -p "Market" "/home/pi/Storage/Videos/Tamako Market/" tamako
+series -w "Hibike! " -p "Euphonium" "/home/pi/Storage/Videos/Hibike! Euphonium/Hibike! Euphonium/" hibike
+series -w "Hibike! " -p "Euphonium 2" "/home/pi/Storage/Videos/Hibike! Euphonium/Hibike! Euphonium S2/" hibike2
+series -w "Love Live! " -p 'Sunshine!!' "/home/pi/Storage/Videos/Love Live! Sunshine!!/Love Live! Sunshine!! S1/" llsun
+series -w "Love Live! " -p 'Sunshine!! 2' "/home/pi/Storage/Videos/Love Live! Sunshine!!/Love Live! Sunshine!! S2/" llsun2
+series -s 5 -w "K-" -p "On!" "/home/pi/Storage/Videos/K-On!/K-On!" kon
+series -w "K-" -p 'On!!' "/home/pi/Storage/Videos/K-On!/K-On!!/" kon2
+series -s 20 -w "Flip " -p "Flappers" "/home/pi/Storage/Videos/Flip Flappers/" flipflap
+series -e "1" -w "New " -p "Game!" "/home/pi/Storage/Videos/New Game!/New Game!/" newgame
+series -w "New " -p 'Game!!' "/home/pi/Storage/Videos/New Game!/New Game!!/" newgame2
+series -e "1" -w "Kobayashi-san Chi no " -p "Maid Dragon" "/home/pi/Storage/Videos/Kobayashi-san Chi no Maid Dragon/" maiddragon
+series -w "Eromanga " -p "Sensei" "/home/pi/Storage/Videos/Eromanga-sensei/" eromanga
+series -w "Non Non " -p "Biyori" "/home/pi/Storage/Videos/Non Non Biyori/Non Non Biyori/" nnb
+series -e "13-" -w "Non Non " -p "Biyori Repeat" "/home/pi/Storage/Videos/Non Non Biyori/Non Non Biyori Repeat/" nnb2
+series -e "13-" -s 30 -w "Yuru " -p "Yuri" "/home/pi/Storage/Videos/YuruYuri/YuruYuri S1/" yuruyuri
+series -e "13-" -s 145 -w "Yuru " -p "Yuri♪♪" "/home/pi/Storage/Videos/YuruYuri/YuruYuri S2/" yuruyuri2
+series -s 30 -w "Yuru Yuri " -p "San☆Hai!" "/home/pi/Storage/Videos/YuruYuri/YuruYuri S3/" yuruyuri3

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Ayashii</title>
+  		<meta charset="UTF-8">
+		<meta name="description" content="The most comfortable corner on the internet.">
+		<meta name="keywords" content="ayashii, info">
+		<link rel="shortcut icon" href="images/favicon.ico"/>
+		<link rel="stylesheet" type="text/css" href="css/style.css">
+		<link rel="stylesheet" href="css/font-awesome-4.7.0/css/font-awesome.min.css">
+		<link href="https://fonts.googleapis.com/css?family=Exo:100,200,400|Source+Sans+Pro:300,400,700" rel="stylesheet">
+		<script src="js/ayashii/login.js"></script>
+	</head>
+
+	<body oncontextmenu="return false">
+		<div class="body"></div>
+		<div class="grad"></div>
+		<div class="header">
+			<div>Ayashii<span>Info</span></div>
+		</div>
+		<br>
+		<form name="login" action="javascript:check(this.form)" method="post" id="loginform">
+			<div class="login">
+				<input spellcheck="false" type="text" placeholder="&#xf2be; username" name="userid" autofocus><br>
+				<input type="password" placeholder="&#xf13e;  password" name="pswrd"><br>
+				<input type="submit" onclick="check(this.form)" value="Login" name="login"/><br>
+				<div class="error" id="error" style="display: none;">
+					<div><i class="fa fa-exclamation-triangle"></i> Invalid credentials</div>
+				</div>
+			</div>
+		</form>
+	</body>
+</html>

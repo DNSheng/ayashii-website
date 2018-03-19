@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Ayashii</title>
+  		<meta charset="UTF-8">
+		<meta name="description" content="The most comfortable corner on the internet.">
+		<meta name="keywords" content="ayashii, info">
+
+		<link rel="shortcut icon" href="images/favicon.ico"/>
+
+		<link rel="stylesheet" type="text/css" href="css/style.css">
+		<link rel="stylesheet" type="text/css" href="css/menu.css">
+		<link rel="stylesheet" href="css/font-awesome-4.7.0/css/font-awesome.min.css">
+		<link href="https://fonts.googleapis.com/css?family=Exo:100,200,400|Source+Sans+Pro:300,400,700" rel="stylesheet">
+
+		<script type "text/javascript" src="js/libs/jquery-3.2.1.min.js"></script>
+		<script src="js/ayashii/login.js"></script>
+		<script src="js/ayashii/menu.js"></script>
+
+		<!--INTERNAL COUNTER 000 -->
+	</head>
+	
+	<body>
+		<div class="body"></div>
+		<div class="grad"></div>
+		<br>
+		<div class="boxcontainer">
+			<div class="title_box clickable" onclick="home();">
+				Ayashii<span>Info</span>
+			</div>
+			<div class="boxblur">
+			<!--HERE-->
+			</div>
+		</div>
+	</body>
+</html>

@@ -1,0 +1,277 @@
+/* CSS for the menu */
+
+.menu-row {
+	position: relative;
+	height: 354px;
+	width: 100%;
+	left: 3px;
+	padding: 1px;
+	margin-top: 2px;
+}
+
+.series-row {
+	border-width: 2px;
+	border-style: solid;
+	width: 100%;
+	left: -3px;
+	top: -5px;
+	margin: 0px 0px 0px 0px;
+	background: rgba(0,0,0,0.62);
+	color: #fff;
+	display: none;
+}
+
+.menu-1 {
+	border-color: #FFFFFF;
+}
+
+.menu-2 {
+	border-color: #FED9EE;
+}
+
+.menu-3 {
+	border-color: #FDB4DE;
+}
+
+.menu-4 {
+	border-color: #FC8FCD;
+}
+
+.menu-5 {
+	border-color: #FC6ABD;
+}
+
+.arrow-box {
+	width: 80px;
+	height: 12px;
+	display: none;
+}
+
+.second-box {
+	left: 700px;
+}
+
+.arrow {
+	position: relative;
+	top: -4px;
+	margin: 0px 0px 0px 0px;
+	border-left: 40px solid transparent;
+	border-right: 40px solid transparent;
+	border-bottom: 12px solid white;
+}
+
+.first-arrow {
+	left: 73px;
+}
+
+.second-arrow {
+	left: 308px;
+	border-bottom: 12px solid #FED9EE;
+}
+
+.third-arrow {
+	left: 543px;
+	border-bottom: 12px solid #FDB4DE;
+}
+
+.fourth-arrow {
+	left: 778px;
+	border-bottom: 12px solid #FC8FCD;
+}
+
+.fifth-arrow {
+	left: 1013px;
+	border-bottom: 12px solid #FC6ABD;
+}
+
+.menu-poster {
+	position: relative;
+	/*border: 2px solid #FC6ABD;*/
+	border: 1px solid #FC6ABD;
+	height: 350px;
+	width: 226px;
+	cursor: pointer;
+}
+
+.poster-img {
+	height: 350px;
+	width: 226px;
+}
+
+.first-poster {
+	position: absolute;
+	left: -4px;
+	top: 0px;
+}
+
+.second-poster {
+	position: absolute;
+	/*left: 603px;*/
+	left: 231px;
+	top: 0px;
+}
+
+.third-poster {
+	position: absolute;
+	/*left: 837px;*/
+	left: 466px;
+	top: 0px;
+}
+
+.fourth-poster {
+	position: absolute;
+	/*left: 1071px;*/
+	left: 701px;
+	top: 0px;
+}
+
+.fifth-poster {
+	position: absolute;
+	left: 936px;
+	/*left: 1305px;*/
+	top: 0px;
+}
+
+.menu-title {
+	/*font-size: 35px;*/
+	font-size: 29px;
+	left: 10px;
+	top: 10px;
+	width: 464px;
+}
+
+.menu-img {
+	position: absolute;
+	/*
+		(464x261) - Two poster width
+		(633x356) - Full height
+	*/
+	width: 620px;
+	height: 356px;
+	right: 0px;
+	top: 0px;
+	/*right: 10px;
+	top: 10px;*/
+}
+
+.menu-content {
+	position: absolute;
+	left: 12px;
+	font-family: 'Exo', sans-serif;
+	font-size: 12px;
+	font-weight: 400;
+	color: #FC6ABD;
+}
+
+.menu-content span {
+	color: #fff;
+}
+
+.play-box {
+	position: absolute;
+	width: 125px;
+	height: 32px;
+	top: 50px;
+	left: 407px;
+	color: #FC6ABD;
+	border: 1px solid #FC6ABD;
+	border-radius: 5px;
+}
+
+.play-box i {
+	position: absolute;
+	font-size: 30px;
+	top: 1px;
+	/*left: 2px;*/
+	left: 8px;
+	color: inherit;
+}
+
+.play-box p {
+	position: absolute;
+	top: -20px;
+	left: 42px;
+	color: inherit;
+	font-family: 'Exo', sans-serif;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.play-box:hover {
+	color: #fff;
+	border: 1px solid #fff;
+}
+
+.mal-link {
+	top: 90px;
+	left: 430px;
+}
+
+.mal-link img {
+	position: absolute;
+	top: 0px;
+	left: -20px;
+}
+
+.mal-link a {
+	color: #fff;
+	text-decoration: none;
+}
+
+.mal-link a:hover {
+	text-decoration: underline;
+}
+
+.menu-aired {
+	top: 70px;
+}
+
+.menu-eps {
+	top: 50px;
+}
+
+.menu-genre {
+	top: 90px;
+}
+
+.menu-desc {
+	padding-right: 30px;
+	font-size: 13px;
+	font-weight: 200;
+	top: 113px;
+	width: 492px;
+	height: 224px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	color: #fff;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(120,120,120,0.5);
+	border-radius: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: rgba(0,0,0,0);
+}
+
+::-moz-scrollbar-track {
+	background: rgba(0,0,0,0);
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(155,155,155,0.5);
+}
+
+::-moz-scrollbar-corner {
+	background-color: rgba(0,0,0,0);
+}
+
+::-webkit-scrollbar-corner {
+	background-color: rgba(0,0,0,0);
+}

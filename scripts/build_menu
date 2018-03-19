@@ -1,0 +1,379 @@
+#!/bin/bash
+
+IFS='
+'
+
+#dest="/home/tea/Programming/ayashii/test"
+dest="/var/www/html"
+
+optimize_query() {
+	# Optimize Google search queries
+	# Assume 2 exclamation = S2 (Ex. K-On!!)
+	query=$(echo "$query" | sed "s/\!\!/%20S2/g")
+	query=$(echo "$query" | sed "s/??/%20S2/g")
+}
+
+format_desc() {
+	# Propery format description info from MAL
+	# Single quotes
+	desc=$(echo "$desc" | sed "s/&#039;/'/g")
+	# Double quotes
+	desc=$(echo "$desc" | sed 's/&quot;/"/g')
+	# French e
+	desc=$(echo "$desc" | sed 's/&eacute;/é/g')
+	# Remove [Written by...]
+	desc=$(echo "$desc" | sed 's/\[Written.*//g')
+	# Remove (Source:...)
+	desc=$(echo "$desc" | sed 's/(Source.*//g')
+}
+
+get_desc() {
+	desc=$(sed 's/>/>\n/g' $pull_html | grep description | grep -o content=\".* | tail -n 1 | cut -d '"' -f 2)
+	format_desc
+}
+
+get_date() {
+	date=$(grep -A1 "Premiered:<" $pull_html | tail -n 1 | cut -d '>' -f 2 | cut -d '<' -f 1)
+}
+
+get_num_eps() {
+	num_eps=$(grep -A1 "Episodes:<" $pull_html | tail -n 1 | cut -d ' ' -f 3)
+}
+
+get_duration() {
+	ep_dur=$(grep -A1 "Duration:<" $pull_html | tail -n 1 | grep -o "[0-9]*")
+}
+
+get_studios() {
+	studio_str=$(grep -A1 "Studios:<" $pull_html | tail -n 1 | sed 's/a>/a>\n/g')
+	num_studios=$(echo -e "$studio_str" | wc -l)
+	num_studios=$((num_studios-1))
+	studio_list=$(echo -e "$studio_str" | head -n $num_studios)
+	for line in $studio_list; do
+		tmp_studio=$(echo $line | cut -d '>' -f 2 | cut -d '<' -f 1)
+		studio="${studio}, ${tmp_studio}"
+	done
+	studio=$(echo $studio | cut -c 3-)
+}
+
+get_genres() {
+	genre_str=$(grep -A1 "Genres:<" $pull_html | tail -n 1 | sed 's/a>/a>\n/g')
+	num_genre=$(echo -e "$genre_str" | wc -l)
+	num_genre=$((num_genre-1))
+	genre_list=$(echo -e "$genre_str" | head -n $num_genre)
+	for line in $genre_list; do
+		tmp_genre=$(echo $line | cut -d '>' -f 2 | cut -d '<' -f 1)
+		genre="${genre}, $tmp_genre"
+	done
+	genre=$(echo $genre | cut -c 3-)
+}
+
+gather_data() {
+	# Get search input for Google ready
+	series_name=$(basename "$folder")
+	query=$(echo "$series_name" | sed 's/ /%20/g')
+	optimize_query
+
+	# Download pages
+	wget -q --user-agent="Mozilla/5.0" "www.google.com/search?q=${query}%20MAL" -O $pull_html
+	mal_url=$(sed 's/>/>\n/g' $pull_html | grep -o "http.*myanime.*" | head -n 1 | cut -d '&' -f 1)
+	echo $mal_url
+	wget -q --user-agent="Mozilla/5.0" $mal_url -O $pull_html
+	img_url=$(sed 's/>/>\n/g' $pull_html | grep -o "<img.*ac" | head -n 1 | grep -o "http.*" | cut -d '"' -f 1)
+	echo $img_url
+
+	# Download poster image
+	wget -q $img_url -O "${dest}/images/posters/${title}_poster.jpg"
+
+	# Get data from downloaded html
+	get_desc
+	get_date
+	get_studios
+	get_num_eps
+	get_duration
+	get_genres
+
+	# Delete the html file
+	rm $pull_html
+}
+
+build_menu_entry() {
+	# Build poster
+	sed -i '/'"<!--MENU$current_row"'/a '"\t\t\t\t\t\t<div class=\"menu-poster ${poster_class}\">\n\t\t\t\t\t\t<img class=\"poster-img\" src=\"images/posters/${title}_poster\.jpg\" id=\"p${series_count}\">\n\t\t\t\t\t</div>"'' ${dest}/menu
+
+	# Build arrow
+	sed -i '/'"<!--ARROW$current_row"'/a '"\t\t\t\t\t<div class=\"arrow-box\" id=\"a${series_count}\">\n\t\t\t\t\t<div class=\"arrow ${arrow_class}\"></div>\n\t\t\t\t</div>"'' ${dest}/menu
+
+	# Build menu
+	sed -i '/'"<!--ROW$current_row"'/a '"\t\t\t\t\t<div class=\"menu-row series-row ${menu_class}\" id=\"m${series_count}\">\n\t\t\t\t\t<div class=\"title_box menu-title\">${header1}<span>${header2}</span></div>\n\t\t\t\t\t<img class="menu-img" src=\"${media_dest}img1_3\.jpg\" id=\"g${series_count}\">\n\t\t\t\t\t<a href=\"${title}\">\n\t\t\t\t\t\t<div class=\"play-box\">\n\t\t\t\t\t\t\t<i class=\"fa fa-play-circle-o fa-2x\" aria-hidden=\"true\"></i>\n\t\t\t\t\t\t\t<p>PLAY<p>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t</a>\n\t\t\t\t\t<div class=\"menu-content mal-link\">\n\t\t\t\t\t\t<a href=\"${mal_url}\">\n\t\t\t\t\t\t\t<img src=\"images/mal.ico\">\n\t\t\t\t\t\t\tMyAnimeList Page\n\t\t\t\t\t\t</a>\n\t\t\t\t\t</div>\n\t\t\t\t\t<div class=\"menu-content menu-aired\">Aired: <span>${date}</span>&nbsp;&nbsp;&nbsp;&nbsp;Studio: <span>${studio}</span></div>\n\t\t\t\t\t<div class=\"menu-content menu-eps\">Episodes: <span>${num_eps}</span>&nbsp;&nbsp;&nbsp;&nbsp;Runtime: <span>${ep_dur} mins</span></div>\n\t\t\t\t\t<div class=\"menu-content menu-genre\">Genres: <span>${genre}</span></div>\n\t\t\t\t\t<div class=\"menu-content menu-desc\">\n\t\t\t\t\t\t${desc}\n\t\t\t\t\t</div>\n\t\t\t\t</div>"'' ${dest}/menu
+
+	# Remove tab fragments
+	sed -i 's/^t//g' ${dest}/menu
+
+	# Update internal counter
+	sed -i "s/COUNTER ${old_series_count}/COUNTER ${series_count}/g" ${dest}/menu
+}
+
+shift_first() {
+	sed -i 's/menu\-1/menu\-2/g' ${dest}/menu
+	sed -i 's/first\-arrow/second\-arrow/g' ${dest}/menu
+	sed -i 's/first\-poster/second\-poster/g' ${dest}/menu
+}
+
+shift_second() {
+	sed -i 's/menu\-2/menu\-3/g' ${dest}/menu
+	sed -i 's/second\-arrow/third\-arrow/g' ${dest}/menu
+	sed -i 's/second\-poster/third\-poster/g' ${dest}/menu
+}
+
+shift_third() {
+	sed -i 's/menu\-3/menu\-4/g' ${dest}/menu
+	sed -i 's/third\-arrow/fourth\-arrow/g' ${dest}/menu
+	sed -i 's/third\-poster/fourth\-poster/g' ${dest}/menu
+}
+
+shift_fourth() {
+	sed -i 's/menu\-4/menu\-5/g' ${dest}/menu
+	sed -i 's/fourth\-arrow/fifth\-arrow/g' ${dest}/menu
+	sed -i 's/fourth\-poster/fifth\-poster/g' ${dest}/menu
+}
+
+shift_fifth() {
+	sed -i 's/menu\-5/menu\-6/g' ${dest}/menu
+	sed -i 's/fifth\-arrow/sixth\-arrow/g' ${dest}/menu
+	sed -i 's/fifth\-poster/sixth\-poster/g' ${dest}/menu
+}
+
+shift_sixth() {
+	# Not actually, but a needed work around as an identifier
+	sed -i 's/menu\-6/menu\-1/g' ${dest}/menu
+	sed -i 's/sixth\-arrow/first\-arrow/g' ${dest}/menu
+	sed -i 's/sixth\-poster/first\-poster/g' ${dest}/menu
+
+}
+
+move_lines_up() {
+	# 	$1	- Start of line to move
+	#	$2	- Destination line
+	#	$3	- Number of lines to move
+
+	mv_start=$1
+	mv_dest=$2
+	i=0
+	while [ $i -lt $3 ]; do
+		mv_ln1=$(sed ''"${mv_start}"'q;d' ${dest}/menu)
+		mv_ln2=$(sed ''"${mv_dest}"'q;d' ${dest}/menu)
+		#echo "With i: ${i},  Moving line: $mv_ln1 to $mv_ln2"
+		#echo "Before move: $mv_start $mv_dest"
+		printf %s\\n ${mv_start}m${mv_dest} w q | ed -s ${dest}/menu
+		mv_start=$((mv_start + 1))
+		mv_dest=$((mv_dest + 1))
+		i=$((i+1))
+	done;
+}
+
+move_lines_down() {
+	# 	$1	- Start of line to move
+	#	$2	- Destination line
+	#	$3	- Number of lines to move
+
+	mv_start=$1
+	mv_dest=$2
+	j=0
+	while [ $j -lt $3 ]; do
+		mv_ln1=$(sed ''"${mv_start}"'q;d' ${dest}/menu)
+		mv_ln2=$(sed ''"${mv_dest}"'q;d' ${dest}/menu)
+		echo "With j: ${j},  Moving line: $mv_ln1 to $mv_ln2"
+		echo "Before move: $mv_start $mv_dest"
+		printf %s\\n ${mv_start}m${mv_dest} w q | ed -s ${dest}/menu
+		#mv_start=$((mv_start - 1))
+		#mv_dest=$((mv_dest + 1))
+		j=$((j+1))
+	done
+
+}
+
+shift_new_entry() {
+	### POSTER ###
+	# Line num for poster
+	first_p_num=$(grep -n "first\-poster" ${dest}/menu | cut -d ':' -f 1)
+	# Line num for MENU001
+	menu_num=$(grep -n "<\!--MENU001-->" ${dest}/menu | cut -d ':' -f 1)
+	# Move the 3 poster lines
+	move_lines_up $first_p_num $menu_num 3
+
+	### ARROW ###
+	# Line num for arrow
+	first_a_num=$(grep -n "first\-arrow" ${dest}/menu | cut -d ':' -f 1)
+	first_a_num=$((first_a_num - 1))
+	# Line num for ARROW001
+	arrow_num=$(grep -n "<\!--ARROW001-->" ${dest}/menu | cut -d ':' -f 1)
+	# Move the 3 arrow lines
+	move_lines_up $first_a_num $arrow_num 3
+
+	### ROW MENU ###
+	# Line num for row
+	first_r_num=$(grep -n "menu\-1" ${dest}/menu | cut -d ':' -f 1)
+	# Line num for ROW001
+	row_num=$(grep -n "<\!--ROW001-->" ${dest}/menu | cut -d ':' -f 1)
+	# Move the 22 lines
+	move_lines_up $first_r_num $row_num 22
+}
+
+shift_first_entry() {
+	#	$1	- i
+	#	$2	- src
+	#	$3	- target
+
+	### POSTER ###
+	first_p_num=$(grep -n "sixth\-poster" ${dest}/menu | head -n ${1} | tail -n 1 | cut -d ':' -f 1)
+	menu_num=$(grep -n "<\!--MENU${target_menu}-->" ${dest}/menu | cut -d ':' -f 1)
+	echo "Moving poster from $first_p_num to $menu_num"
+	move_lines_down $first_p_num $menu_num 3
+	
+	### ARROW ###
+	first_a_num=$(grep -n "sixth\-arrow" ${dest}/menu | head -n ${1} | tail -n 1 | cut -d ':' -f 1)
+	first_a_num=$((first_a_num - 1))
+	arrow_num=$(grep -n "<\!--ARROW${target_menu}-->" ${dest}/menu | cut -d ':' -f 1)
+	echo "Moving arrow from $first_a_num to $arrow_num"
+	move_lines_down $first_a_num $arrow_num 3
+
+	### ROW MENU ###
+	first_r_num=$(grep -n "menu\-6" ${dest}/menu | head -n ${1} | tail -n 1 | cut -d ':' -f 1)
+	row_num=$(grep -n "<\!--ROW${target_menu}-->" ${dest}/menu | cut -d ':' -f 1)
+	echo "Moving row from $first_r_num to $row_num"
+	move_lines_down $first_r_num $row_num 22
+}
+
+shift_entries() {
+	# We made a new row, then shift
+	# This is before the new entry
+	# Simple shifting if first 5 entries
+	if [[ ! 10#$series_count == "001" ]] && [[ 10#$series_count -lt 006 ]]; then
+		case "$p_in_r" in
+			1)
+				echo SHIFTING FIRST
+				shift_first
+				;;
+			2)
+				echo SHIFTING SECOND
+				shift_second
+				shift_first
+				;;
+			3)
+				echo SHIFTING THIRD
+				shift_third
+				shift_second
+				shift_first
+				;;
+			4)
+				echo SHIFTING FOURTH
+				shift_fourth
+				shift_third
+				shift_second
+				shift_first
+				;;
+		esac
+	elif [[ ! 10#$series_count -lt 006 ]]; then
+		echo SHIFT ROWS
+		shift_fifth
+		shift_fourth
+		shift_third
+		shift_second
+		shift_first
+	fi
+}
+
+shift_vertically() {
+	# Fancy shifting for > 5 entries, move between rows
+	if [[ ! 10#$series_count -lt 006 ]]; then
+		# Get number of rows in menu 
+		row_amount=$(cat ${dest}/menu | grep "<\!--MENU" | wc -l)
+
+		# Shift new entry to top
+		shift_new_entry
+
+		# Good until here
+		i=1
+		# Go loop through all but last row
+		while [ $i -lt $row_amount ]; do
+			# Get the target MENUXXX, ARROWXXX, and ROWXXX
+			# (i*5)-4, then pad
+			src_menu=$((i*5))
+			src_menu=$((src_menu - 4))
+			target_menu=$((src_menu + 5))
+			src_menu=$(seq -f "%03g" $src_menu $src_menu)
+			target_menu=$(seq -f "%03g" $target_menu $target_menu)
+			echo "FROM ROW: ${i}, SOURCE MENU: $src_menu TARGET MENU: $target_menu"
+			shift_first_entry $i $src_menu $target_menu
+			i=$((i+1))
+		done;
+		shift_sixth
+	fi
+}
+
+build_menu_html() {
+	# Get the current # of series in menu
+	series_count=$(cat ${dest}/menu | grep -o "COUNTER.*" | cut -d ' ' -f 2)
+	echo "|$series_count|"
+
+	# Get current # of posters in latest row
+	p_in_r=$((10#$series_count % 5))
+	
+	# Save previous series count
+	old_series_count=$series_count
+
+	# Increment series_count for new html
+	series_count=$((10#$series_count + 1))
+
+	# Pad for 3 digits
+	series_count=$(seq -f "%03g" $series_count $series_count)
+
+	# Get current row for building entry
+	current_row=$((10#$old_series_count - $p_in_r))
+	current_row=$((10#$current_row + 1))
+	current_row=$(seq -f "%03g" $current_row $current_row)
+	echo $current_row
+
+	# Make new row if necessary
+	if [[ $p_in_r == 0 ]]; then
+		# Build new menu-row
+		sed -i '/<!--HERE-->/i '" \t\t\t\t\t<div class=\"menu-row\"><!--MENU${series_count}-->\n\t\t\t\t</div>\n<!--ARROW${series_count}-->\n<!--ROW${series_count}-->"'' ${dest}/menu
+		# Remove sed tab error (remaining 't' char)
+		sed -i 's/^t//g' ${dest}/menu
+	fi
+
+	# All new entries will use the "first" classes for easy identification
+	poster_class="first-poster"
+	arrow_class="first-arrow"
+	menu_class="menu-1"
+
+	# Shift before, to avoid moving multiple
+	shift_entries
+
+	# Build new entry in menu for series
+	build_menu_entry
+
+	# TEST
+	shift_vertically
+}
+
+build_menu() {
+	# Gather data for the series
+	gather_data
+
+	# Build html
+	build_menu_html
+}
+
+pull_html="${dest}/pull_html"
+
+### TEMP FOR TESTING, NOT NEEDED WHEN INCORPORATING WITH SERIES SCRIPT ###
+folder=$1
+title=$2
+header1=$3
+header2=$4
+media_dest="media/$title/"
+### TEMP ###
+
+build_menu

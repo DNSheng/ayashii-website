@@ -1,0 +1,803 @@
+#!/bin/bash
+
+### NOTES ###
+
+# Dependencies:
+#	- ffmpeg (Written using 3.4)
+#	- fc-scan (Written using 2.12.6)
+#	- mkvmerge (Written using 18.0.0)
+#	- mkvextract (Written using 18.0.0)
+#	- getopt (Written using util-linux 2.31)
+#	- GNU ed (Written using 1.10)
+#		- Used in "build_menu"
+#
+# NEWEST ADDITIONS/FIXES:
+#	- Finally, a menu for all series has been created
+#		- Alongside, we created a gif preview, combining all frames used in episode gifs
+#		- Kept seperately, in "build_menu" (name not final)
+#			- Can be run seperately, with right input (but no documentation given)
+#	- Fixed bug with appending
+#		- Font mapping variable would get ruined if no fonts added
+#	- Check for gif-frames argument
+#		- Must be >= 3
+#	- Fixed bug with append
+#		- Only append if files to append exist
+#	- Added tabs for the html and js (cleaner formatting)
+#
+# TODO:
+#	- Hold off or workaround for build_menu_gif() for less than 5 episodes
+#		- build_menu_gif() is called at the end of build()
+#			- Therefore we know how many episodes were built
+#			- Therefore we can write some logic for cases less than 5 episodes
+#	- Implement a "clean" operation in "build_menu"
+#	- Merge operation
+#	- More info to list ('-l') operation
+#		- Tracks for each file
+#	- Description operation/option ('-d' flag)
+#	- Get piped args as well (either cat or read in the no args part)
+#	- Should -l (list) be atomic? (No option/mode flags)
+#		- The only reasonable option flag is -e
+#		- At that point, perhaps show both $int_counter and $counter
+#			- But the user won't understand that really
+
+### NOTES ###
+
+# Script version (no real point to this)
+version="0.4.3"
+
+# Used for reading targeted folder
+IFS='
+'
+
+### Modify me with the destination of /var/www/html ###
+#dest="/var/www/html"
+dest="/home/tea/Programming/ayashii/html"
+
+# External counter for operations (all files in folder we allow (not excluded))
+# Work with the assumption that we are not excluding an episode mid-way through a series
+# 	- Doing so would make the "Episode #" in the preview boxes incorrect
+counter=1
+
+usage() {
+	echo     "series - Upload a series to Ayashii.info"
+	echo     "author: Dan Sheng, 2017"
+	echo	 "version: $version"
+	echo	 ""
+	echo	 "Currently only supports .mkv and .mp4 video files"
+	echo     ""
+	echo -n  "usage: series [-h] [-v] [-c series...] [-a path series] [-l path] [-i series"
+	echo -en "] [-f]\n\t      [-e number/range] [-s seconds] [-g number] [-t number] [-n] "
+	echo -en "[-w string]\n\t      [-p string] path series"
+	echo     ""
+	echo     "Getting help:"
+	echo -e  "-h | --help\t\t\t\tShow help menu"
+	echo -e  "-v | --version\t\t\t\tShow version"
+	echo     ""
+	echo     "Operations:"
+	echo -e  "-c | --clean series1 series2\t\tRemove one or more series from the website"
+	echo -e  "-a | --append /path/to/files/ series\tAppend/update an existing series with new episodes"
+	echo -e  "-l | --list /path/to/files/\t\tList contents of folder - useful for excluding files"
+	echo -e  "-i | --new-images series\t\tRebuild preview images and gifs for an existing series"
+	echo -e  "-m | --merge \t\t\t\tMerge two series (TODO)"
+	echo -e  "-r | --rename \t\t\t\tRename a series (TODO)"
+	echo     ""
+	echo     "Options:"
+	echo -e  "-f | --force\t\t\t\tForce all operations (no prompts)"
+	echo -e  "-e | --exclude \"1 3 4-6 9-\"	\tExclude episodes in folder (single videos and ranges)"
+	echo -e  "-s | --timestamp 54\t\t\tTimestamp to grab video preview (seconds,default=3)"
+	echo -e  "-g | --gif-frames 7\t\t\tFrames for the preview gif, must be >=3 (defaut=5)"
+	echo -e  "-t | --subtrack 3\t\t\tSubtitle track to extract (default first sub file)"
+	echo -e  "-n | --nosubs\t\t\t\tIgnore subtitle creation"
+	echo -e  "-w | --white \"Ayashii \"\t\t\tSet white text for site header"
+	echo -e  "-p | --pink \"Info\"\t\t\tSet pink text for site header"
+	echo -e  "-d | --description \"13\" \"OVA 1\"\t\tSet description of an episode in preview box"
+	echo     ""
+}
+
+clean() {
+	# Operation that removes: html file, navigator script, media folder
+	#			    modifies: login.js random site array
+
+	# Change IFS within scope of function to iterate through list
+	IFS=' '
+
+	# Iterate through all args, deleting if they exist
+	for series in $clean_list; do
+		tmp_series="$dest/$series"
+		if [ ! -e $tmp_series ]; then
+			echo "Series does not exist: $series"
+		else
+			echo "Deleting series: $series"
+
+			rm  "$dest/$series"
+			rm  "$dest/js/${series}.js"
+			rm -r "$dest/media/$series"
+
+			# Remove entries of series in js array, assumption of possible multiple entries
+			tmp_end=", \"$series\""
+			tmp_mid="\"$series\", "
+		
+			# Remove all middle entries first
+			sed -i 's@'"$tmp_mid"'@@g' $dest/js/ayashii/login.js
+			# Remove tail entry
+			sed -i 's@'"$tmp_mid"'];@];@g' $dest/js/ayashii/login.js
+			# Remove head entry
+			sed -i 's@\['"$tmp_mid"'@\[@g' $dest/js/ayashii/login.js
+		fi
+	done
+}
+
+build_font_lists() {
+	# We will:
+	#	- Extract font attachments from .mkv, add to $font_list
+	#	- Extract font names from .ass, add to $name_list
+
+	IFS='
+	'
+	info=$(mkvmerge -i "${folder}$file")
+	
+	### Get list of font attachments/files ###
+	attachments=$(echo "$info" | grep Attachment)
+	for line in $attachments; do
+		# Get font file and attachment number
+		tmp_font_num=$(echo $line | cut -d ' ' -f 3)
+		font_num=${tmp_font_num%?}
+		tmp_font_file=$(echo $line | cut -d ' ' -f 11-)
+		font_file=${tmp_font_file:1:${#tmp_font_file}-2}
+		echo -e "\t$file -> $font_file"
+
+		# Check if font was extracted already
+		if [[ ! -f ${media_dest}$font_file ]]; then
+			# New font found, extract it
+			echo -e "\t\tNEW FONT FILE FOUND: $font_file"
+			mkvextract attachments ${folder}$file $font_num:${media_dest}$font_file
+
+			# Add to list, changes depending on if first or middle/last entry
+			if [[ -z $font_list ]]; then
+				font_list=$font_file
+			else
+				font_list="$font_list\n$font_file"
+			fi
+		fi
+	done
+
+	### Get list of font names ###
+	### This gets font names from the "Style" part of the sub files ###
+	style_list=$(cat $subfile | grep ^Style:)
+	for line in $style_list; do
+		# Get the font name
+		font_name=$(echo $line | cut -d ',' -f 2)
+		# Populate font $name_list
+		echo -e "\t$subfile -> $font_name"
+		if [[ -z $name_list ]]; then
+			echo -e "\t\tADDED: $font_name"
+			# First entry, add directly
+			name_list=$font_name
+		elif [[ $(echo $name_list | grep $font_name) == "" ]]; then
+			echo -e "\t\tADDED: $font_name"
+			# Entry not already in $name_list, add
+			name_list="${name_list}\n${font_name}"
+		fi
+	done
+
+	### This gets font names from within the dialogue ###
+	# The if-elif-else is in case no styles are declared (mostly a safety precaution)
+	# This finds lines with \fn and cleans them to only have the font name
+	name=$(cat $subfile | grep -o "\\fn.*" | cut -d '\' -f 1 | cut -c 3- | cut -d '}' -f 1)
+	for line in $name; do
+		if [[ -z $name_list ]]; then
+			echo -e "\t\tADDED: $line"
+			# First entry, add directly
+			name_list=$line
+		elif [[ $(echo $name_list | grep $line) == "" ]]; then
+			echo -e "\t\tADDED: $line"
+			# Entry not already in $name_list, add
+			name_list="${name_list}\n${line}"
+		fi
+	done
+}
+
+build_fontMap() {
+	# This will simply build the $font_map variable
+	echo "Building map with $name and $font | $counter"
+	# Add a comma and space if not first mapping or appending to existing series
+	if [[ $counter -gt 1 ]] || [[ ! -z $APPEND_FLAG ]]; then
+		font_map="${font_map}, [\"$name\", 'url(\"$vid_dest$font\")']"
+	else
+		font_map="${font_map}[\"$name\", 'url(\"$vid_dest$font\")']"
+	fi
+	counter=$((counter+1))
+}
+
+font_matching() {
+	# For all names of fonts, match them to a font file
+	# If a match is found, call build_fontMap() to map the association
+
+	# Flag for breaking out of for-loops and moving on to next font name
+	name_matched=0
+
+	# Reset counter for build_fontMap()
+	counter=1
+
+	# For each font name in all .ass sub files
+	for name in $(echo -e $name_list); do
+		echo "FOR FONT NAME: $name"
+		# For each font file extracted
+		for font in $(echo -e $font_list); do
+			echo -e "\t LOOKING AT $font"
+			# Get raw family data from font file
+			raw_font_fam=$(fc-scan $media_dest$font | grep family: | cut -d ' ' -f 2-)
+			# For all fields in font family, extract info (from the quotations)
+			for family in $raw_font_fam; do
+				fields=$(echo $family | grep -o "\"" | wc -l)
+				# Get first 3 family fields (hard-coding this)
+				f1=$(echo $family | cut -d '"' -f 2)
+				f2=$(echo $family | cut -d '"' -f 4)
+				f3=$(echo $family | cut -d '"' -f 6)
+				# Check for matching between family fields and $name
+				if [[ $name == $f1 ]] || [[ $name == $f2 ]] || [[ $name == $f3 ]]; then
+					build_fontMap
+					name_matched=1
+					break;
+				fi
+			done
+			# Match found for $name, move to next $name
+			if [[ $name_matched == 1 ]]; then
+				break;
+			fi
+		done
+		# Reset for every new $name
+		name_matched=0
+	done
+
+	# Cap off the variable
+	font_map="${font_map}]);"
+	# Write to the navigator.js
+	sed -i '/..MAP/i '"$font_map"'' $dest/js/${title}.js
+}
+
+build_subs() {
+	# Name of video file
+	vid_name=${file%\.*}
+	# If no subtrack arg given, get default one
+	if [[ -z $u_subtrack ]]; then
+		# Get the subtitle track number into $subtrack
+		trackcut=$(mkvmerge -i "${folder}$file" | grep subtitles | cut -d ' ' -f 3 )
+		subtrack=${trackcut:0:1}
+	else
+		subtrack=$u_subtrack
+	fi
+
+	# Store the subtrack name, useful for font mapping & extraction
+	subfile="${media_dest}${vid_name}.ass"
+	# Extract tracks and move to $media_dest
+	mkvextract tracks "${folder}$file" "$subtrack":"$subfile"
+	echo "SUBFILE: $subfile"
+	# Map fonts with the $subfile
+	build_font_lists
+}
+
+build_preview_box() {
+	# Write the preview_box for all episodes
+	# Links images too
+	echo BUILDING PREVIEW BOX
+	sed -i '/<!--edit-->/i '"\t\t\t\t\t\t<div class=\"preview_box\">\n\t\t\t\t\t\t<a href=\"\#\" class=\"vid$counter\">\n\t\t\t\t\t\t\t<img id=\"img${counter}\" src=\"media/$title/img${counter}.jpg\">\n\t\t\t\t\t\t\t<div class=\"ep_desc\">Episode $counter</div>\n\t\t\t\t\t\t\t<div class=\"current_view\" id=\"view$counter\">Currently Watching</div>\n\t\t\t\t\t\t</a>\n\t\t\t\t\t</div>"'' $dest/$title
+}
+
+build_preview_imgs() {
+	# If no arg given, default to 3 seconds
+	if [[ -z $preview_time ]]; then
+		preview_time=3
+	fi
+	ffmpeg -loglevel quiet -y -ss $preview_time -i $item -vframes 1 -q:v 2 -vf scale=1024x576 ${media_dest}img${counter}.jpg
+	echo "Finished building image for: $file to img${counter}.jpg"
+}
+
+build_preview_gif() {
+	# Build a gif to show when hovering over preview box for an episode
+	# Counter for gif frames
+	gif_counter=1
+	# Variable for number of frames per gif, default 5
+	if [[ -z $gif_frames ]]; then
+		gif_frames=5
+	fi
+
+	# Get an interval based on video length
+	probe_output=$(ffprobe -i $item -show_format -v quiet | grep duration)
+	duration=$(echo $probe_output | cut -d '=' -f 2 | cut -d '.' -f 1)
+	# Get remainder of time after first preview image
+	remainder=$((duration - $preview_time))
+	frame_interval=$((remainder / gif_frames))
+	# Set up variable for time to take image
+	gif_time=$((preview_time + frame_interval))
+
+	# Copy preview image, to speed things up
+	cp ${media_dest}img${counter}.jpg ${media_dest}img${counter}_${gif_counter}.jpg
+
+	# Take snapshots every $frame_interval
+	while [[ $gif_counter != $gif_frames ]]; do
+		# Increment counter
+		gif_counter=$((gif_counter+1))
+		# Take snapshot
+		ffmpeg -loglevel quiet -y -ss $gif_time -i $item -vframes 1 -q:v 2 -vf scale=1024x576 ${media_dest}img${counter}_${gif_counter}.jpg
+		echo "Finished building gif frame for: $file to img${counter}_${gif_counter}.jpg"
+		# Add interval
+		gif_time=$((gif_time + frame_interval))
+	done
+
+	# Build a gif from all images
+	ffmpeg -framerate 2 -i "${media_dest}img${counter}_%d.jpg" -vf scale=256x144 ${media_dest}img${counter}.mp4
+	ffmpeg -i ${media_dest}img${counter}.mp4 -vf palettegen ${media_dest}palette${counter}.png
+	ffmpeg -i ${media_dest}img${counter}.mp4 -i ${media_dest}palette${counter}.png -lavfi paletteuse ${media_dest}img${counter}.gif
+	#ffmpeg -f image2 -framerate 2 -i ${media_dest}img${counter}_%d.jpg -vf scale=256x144 ${media_dest}img${counter}.gif
+	echo "Finished building gif for: $file to ${media_dest}img${counter}.gif"
+
+	# Remove intermediate files
+	rm ${media_dest}palette${counter}.png
+	rm ${media_dest}img${counter}.mp4
+}
+
+build_menu_gif() {
+	# Build the gif to be used for the menu
+	# THIS WORKS WELL FOR 5 OR MORE BUILT EPISODES
+	# ASSUMES THAT AT LEAST 3 GIF FRAMES BUILT
+
+	# Get all images in from the folder
+	img_list=$(ls ${media_dest} | grep "img._")
+	# Rename those images in an incremental form for ffmpeg ease of use
+	menu_counter=00
+	for menu_img in $img_list; do
+		# Stop after 5 images/frames
+		if [[ $menu_counter -eq 5 ]]; then
+			break
+		fi
+		menu_counter=$(seq -f "%02g" $menu_counter $menu_counter)
+		# Get 3rd image for every series
+		### TODO: Maybe change in future based on # of gif frames
+		if [[ $menu_img =~ img._3.jpg ]]; then
+			cp ${media_dest}$menu_img ${media_dest}img${menu_counter}.jpg
+			echo "Copying ${media_dest}$menu_img to ${media_dest}img${menu_counter}.jpg"
+			menu_counter=$((10#$menu_counter + 1))
+		fi
+	done
+	# Build a temporary video
+	ffmpeg -y -framerate 1 -i ${media_dest}img%02d.jpg -vf scale=620x356 ${media_dest}menu.mp4
+	# Build a color palette
+	ffmpeg -y -i ${media_dest}menu.mp4 -vf palettegen ${media_dest}palette_menu.png
+	# Use the palette to build the gif
+	ffmpeg -y -i ${media_dest}menu.mp4 -i ${media_dest}palette_menu.png -lavfi paletteuse ${media_dest}menu.gif
+	
+	# Remove the leftover images
+	ls ${media_dest} | grep "img[0-9][0-9].jpg" | sed 's/^/'"${media_dest}"'/g' | xargs rm
+	rm ${media_dest}palette_menu.png
+	# Remove temp video
+	rm ${media_dest}menu.mp4
+}
+
+build_navigator() {
+	# Build the navigator, events on click for each div/video in the carousel
+	# Loads the video, subs, removes previous subs, shows "Currently Watching"
+	echo BUILDING NAVIGATOR
+	sed -i '/..Here/i '"\$(\"\.vid${counter}\")\.click(function() {\n\tplayer\.src({type: \'video/webm\', src: \'${vid_dest}${file}\'});\n\tplayer\.poster(\'${vid_dest}img${counter}\.jpg\');\n\tplayer\.ass({\'src\': \'${vid_dest}${vid_name}\.ass\', label: \"engsub${counter}\"});\n\tplayer\.removeRemoteTextTrack(player\.remoteTextTracks()[0]);\n\tthis_view = \$(\"#view${counter}\");\n\tif(current_view != this_view) {\n\t\tcurrent_view\.fadeOut(300);\n\t\tthis_view\.fadeIn(300);\n\t\tcurrent_view = this_view;\n\t}\n\tplayer\.play();\n});\n\$(\"\.vid${counter}\")\n\t\.mouseenter(function() {\n\t\t\$(\"#img${counter}\")\.attr(\"src\", \"${vid_dest}img${counter}\.gif\");\n})\n\t\.mouseleave(function() {\n\t\t\$(\"#img${counter}\")\.attr(\"src\", \"${vid_dest}img${counter}\.jpg\");\n});\n"'' $dest/js/${title}.js
+}
+
+build_item() {
+	# Cut out filename and video name
+	file=$(echo $item | rev | cut -d '/' -f 1 | rev )
+	vid_name=${file%\.*}
+
+	# Build image, html, and js
+	build_preview_imgs
+	build_preview_gif
+	build_preview_box
+	build_navigator
+	# Remove tab fragment
+	sed -i 's/^t//g' ${dest}/js/${title}.js
+	sed -i 's/^t//g' ${dest}/$title
+
+	# Build a symbolic link to video file
+	ln -sf "${folder}/$file" $media_dest$file
+
+	# If first successful video, set as main video for page
+	if [[ $counter == 1 ]]; then
+		sed -i 's,media/video.mkv,'"$vid_dest$file"',g' $dest/$title
+		sed -i 's,media/subs.ass,'"$vid_dest$vid_name.ass"',g' $dest/js/${title}.js
+		sed -i 's,media/img.jpg,'"${vid_dest}img${counter}.jpg"',g' $dest/$title
+	fi
+}
+
+build_site() {
+	# Set IFS for the for-loop
+	IFS='
+	'
+
+	# List video files in target folder
+	list=$(find "${folder}" -maxdepth 1 \( -name "*.mkv" -o -name "*.mp4" \) -type f | sort )
+
+	# Folder for all video, sub, & image files
+	vid_dest="media/$title/"
+
+	# Internal counter for exclusions (counter for going through all files in folder)
+	int_counter=1
+
+	### BUILD IMG, VIDEO, HTML, AND JS ###
+	for item in ${list}; do
+		# This is messy, as the conditional to build wouldn't work if -e flag not used
+		# This is a temporary workaround
+		if [[ $excluded = "" ]]; then
+			build_item
+			# Only increment external counter on successful runs (aka no exclusion)
+			counter=$((counter + 1))
+		# If internal counter not in excluded list and not past exclusion point, then build
+		# Note: Not guaranteed to work for > 99 episodes, regex update would be required
+		elif [[ ! $excluded =~ .*\ ${int_counter}\ .* ]] && 
+		     [[ $int_counter -lt $exclude_past ]]; then
+			build_item
+			counter=$((counter + 1))
+		fi
+		# External counter for all files in folder
+		int_counter=$((int_counter + 1))
+	done
+
+	### BUILD SUBS ###
+	# Reset int_counter to build subs
+	int_counter=1
+	# Separate make sub option to quickly build website w/ video & imgs first
+	# Makes subs by default unless specified by user with -n flag
+	if [[ ! $nosub == "true" ]]; then
+		# Variables for building the fontMap for navigator.js
+		font_list=""
+		name_list=""
+		# This check is needed if append() is called
+		if [[ -z $font_map ]]; then
+			font_map="var myMap = new Map(["
+		fi
+
+		for item in $list; do
+			file=$(echo $item | rev | cut -d '/' -f 1 | rev)
+			# Build if excluded not set
+			if [[ $excluded = "" ]]; then
+				build_subs "${folder}" $file $title;
+			# Skip building subs for excluded
+			elif [[ ! $excluded =~ .*\ ${int_counter}\ .* ]] &&
+			   [[ $int_counter -lt $exclude_past ]]; then
+				build_subs "${folder}" $file $title;
+			fi
+			int_counter=$((int_counter + 1))
+		done
+		# Match names from $name_list to fonts from $font_list
+		# This also builds $font_map
+		font_matching
+	fi
+}
+
+build_check() {
+	# Check for args exisiting
+	if [ ! -d "${folder}" ]; then
+		echo "Folder not given, exiting..."
+		exit
+	elif [ -d $dest/media/$title ] && [[ $overwrite == 0 ]]; then
+		# Argument for force not given
+		if [[ $force == 1 ]]; then
+			overwrite=1
+		else
+			echo "Warning, series with that title already exists..."
+			echo "Overwrite (Y/N)?"
+			read input
+			if [[ $input != "Y" ]] && [[ $input != "y" ]]; then
+				echo "Exiting..."
+				exit
+			else
+				overwrite=1
+			fi
+		fi
+	fi
+
+}
+
+build() {
+	# Variable for overwriting series
+	overwrite=0
+	
+	# Check if arguments in order before building
+	build_check
+
+	# Create folder to hold all pictures, subtitles, and video files
+	media_dest="$dest/media/$title/"
+	if [[ $overwrite  == 0 ]]; then
+		echo Making dir
+		mkdir $media_dest
+	fi
+
+	# Create html site for new series
+	cp $dest/template/series.html $dest/$title
+
+	# Create navigator script file for new series
+	cp $dest/template/navigator.js $dest/js/${title}.js
+
+	# Replace header in html file
+	sed -i 's,Title1,'"$header1"',g' $dest/$title
+	sed -i 's,Title2,'"$header2"',g' $dest/$title
+
+	# Let html site use new navigator
+	sed -i 's,navigator.js,'"${title}.js"',g' $dest/$title
+	
+	# Build the site (preview img, video, scripts, subtitles)
+	build_site
+	
+	### Add the series header to the javascript file ###
+	# Get the array variable line, cut the '];' part off
+	canvas=$(cat "$dest/js/ayashii/login.js" | grep "var sites" | rev | cut -c 3- | rev)
+	echo "CANVAS: $canvas"
+	tmp_append="${canvas}, \"$title\"];"
+	echo "TMP_APPEND: $tmp_append"
+	# Cut to prevent new tab char with every new series
+	append=$(echo $tmp_append | cut -c 1-)
+
+	# Replace the existing array var with the new one
+	if [[ $overwrite == 0 ]]; then
+		# This removes creating multiple unnecessary entries in the array
+		sed -i 's@var sites.*@'"$append"'@g' $dest/js/ayashii/login.js
+	fi
+
+	# Build the gif for the menu using existing images
+	build_menu_gif
+
+	# Run the other script to build the menu
+	#build_menu "$folder" "$title" "$header1" "$header2"
+}
+
+merge() {
+	# Change IFS within scope
+	IFS=' '
+
+	echo "MERGE UNDER CONSTRUCTION"
+}
+
+append_check() {
+	# Check if appending is necessary (compare episode files)
+	# Get existing files in uploaded series
+	existing=$(ls ${media_dest} | grep "\.m\(kv\)\?\(p4\)\?")
+	# Get all files in target folder
+	target_folder=$(find "${folder}" -maxdepth 1 \( -name "*.mkv" -o -name "*.mp4" \) -type f | sort )
+	int_counter=1
+	IFS='
+	'
+	# Using exclusion list, get files that will be appended
+	for item in $target_folder; do
+		if [[ ! $excluded =~ .*\ ${int_counter}\ .* ]] &&
+		   [[ $int_counter -lt $exclude_past ]]; then
+			appending="${appending}\n${item}"
+		fi
+		int_counter=$((int_counter + 1))
+	done
+
+	# If no files to be appended, exit
+	if [[ -z $appending ]]; then
+		echo "Nothing to append, exiting..."
+		exit
+	fi
+}
+
+append() {
+
+	# Check if folder exists
+	if [[ ! -d $folder ]]; then
+		echo "Error: folder does not exist: $folder" >&2
+		echo "Exiting..." >&2
+		exit
+	fi
+
+	# Check if series exists
+	if [[ ! -f $dest/$title ]]; then
+		echo "Error: series does not exist: $title" >&2
+		echo "Exiting..." >&2
+		exit
+	fi
+	
+	# Media destination
+	media_dest="$dest/media/$title/"
+
+	# Set exclusion list for existing files
+	tmp_exclusion_list="1-"
+	existing=$(ls $media_dest | grep "img[0-9].jpg" | wc -l)
+	# Make a fake user input by combining:
+	#	- Existing built range
+	#	- Parsed exclusion in this append() call
+	tmp_exclusion_list="$tmp_exclusion_list$existing$excluded$exclude_past-"
+	parse_exclude
+
+	# Set the external counter to match append start point
+	counter=$((existing + 1))
+
+	# Check if appending is necessary
+	append_check
+
+	# If building subs:
+	if [[ ! $nosub == "true" ]]; then
+		# Get existing $font_map and uncap
+		font_map=$(cat $dest/js/${title}.js | grep "^var myMap" | rev | cut -c 4- | rev)
+		# Remove existing $font_map from js
+		sed -i 's/^var myMap.*//g' $dest/js/${title}.js
+	fi
+
+	# Build remaining files
+	build_site
+
+	# Rebuild menu gif
+	build_menu_gif
+}
+
+rebuild_imgs() {
+	# THIS IS DONE UNDER THE ASSUMPTION THAT EXCLUDED FILES (IF ANY) WERE AT THE START
+	# AND/OR END OF THE FOLDER. THUS, THERE WERE NO EPISODES MID-SERIES EXCLUDED IN THE
+	# BUILD
+	
+	# Set needed variables
+	media_dest="$dest/media/$title/"
+	# Get all video files in series media folder
+	list=$(ls ${media_dest} | grep ".mkv")
+	# Remove all existing images
+	rm ${media_dest}*.jpg
+	rm ${media_dest}*.gif
+	# For all video files already made in the series media folder, build images/gifs
+	for line in $list; do
+		# Get the entire path to the video file into $item
+		path=$(realpath -s -q "${media_dest}")
+		item="${path}/$line"
+
+		# This is used for the echo after every preview image built (DEBUGGING)
+		file=$(echo $item | rev | cut -d '/' -f 1 | rev )
+
+		#Build
+		build_preview_imgs
+		build_preview_gif
+		counter=$((counter+1))
+	done
+
+	# Rebuild menu gif with new images
+	build_menu_gif
+}
+
+parse_exclude() {
+	# Temp IFS for scope of function
+	IFS=' '
+
+	# Excluded episode list
+	excluded=""
+
+	# Exclude any past this value (high by default)
+	exclude_past=9999
+
+	# If ranges exist, break them down into singular and put in list
+	for ep in $tmp_exclusion_list; do
+		# Start and end range
+		if [[ $ep =~ .+\-.+ ]]; then
+			start=$(echo $ep | cut -d '-' -f 1)
+			ending=$(echo $ep | cut -d '-' -f 2)
+			# Populate excluded list with range
+			while [[ ! $start -eq $ending ]]; do
+				excluded="$excluded $start"
+				start=$((start + 1))
+			done
+			excluded="$excluded $ending"
+		# Only start range (exclude remaining)
+		elif [[ $ep =~ .+\-$ ]]; then
+			exclude_past=$(echo $ep | cut -d '-' -f 1)
+		# Single index
+		else
+			excluded="$excluded $ep"
+		fi
+	done
+
+	# Space added to help regex exclusion filtering when building
+	excluded="$excluded "
+}
+
+list_folder() {
+	# Get all .mkv and .mp4 files in folder, print them indexed by $counter
+	list=$(find "${folder}" -maxdepth 1 \( -name "*.mkv" -o -name "*.mp4" \) -type f | sort )
+
+	for item in $list; do
+		printf "[%+2s] %s\n" "$counter" "$item"
+		counter=$((counter + 1))
+	done
+}
+
+gif_frame_check() {
+	if [[ $gif_frames -lt 3 ]]; then
+		echo "Number of gif frames must be greater than 3!"
+		echo "Exiting..."
+		exit
+	fi
+}
+
+# If no args/flags given, show help
+if [[ -z "$@" ]]; then
+	usage
+	exit 1
+fi
+
+OPTS=`getopt -o hvcal:i:mfe:s:g:t:nw:p:d: --long help,version,clean,append,list:,new-images:,merge,force,exclude:,timestamp:,gif-frames:,subtrack:,nosubs,white:,pink: -- "$@"`
+if [ $? != 0 ]; then echo "Failed parsing options." >&2 ; exit 1; fi
+
+#echo "$OPTS"
+eval set -- "$OPTS"
+
+while true; do
+	case "$1" in
+		-h | --help ) usage; exit ;;
+		-v | --version ) echo "$0 version: $version"; exit ;;
+		# Clean operation set
+		-c | --clean ) CLEAN_FLAG=1; shift ;;
+		# Appending operation set
+		-a | --append ) APPEND_FLAG=1; shift ;;
+		# Listing contents of $2
+		-l | --list ) folder=$2; list_folder; exit ;;
+		# Rebuilding images
+		-i | --new-images ) NEW_IMG_FLAG=1; shift ;;
+		# Merging series
+		-m | --merge ) MERGE_FLAG=1; shift ;;
+		# Forcing opts
+		-f | --force ) force=1; shift ;;
+		# Exclude $2
+		-e | --exclude ) tmp_exclusion_list=$2; parse_exclude; shift; shift ;;
+		# Screenshot at $2
+		-s | --timestamp ) preview_time=$2; shift; shift ;;
+		# Gif frames $2
+		-g | --gif-frames ) gif_frames=$2; gif_frame_check; shift; shift ;;
+		# Subtrack $2
+		-t | --subtrack ) u_subtrack=$2; shift; shift ;;
+		# No subs built
+		-n | --nosubs ) nosub="true"; shift ;;
+		# White text $2
+		-w | --white ) header1=$2; shift; shift ;;
+		# Pink text $2
+		-p | --pink ) header2=$2; shift; shift ;;
+		-- ) shift; break ;;
+		* ) break ;;
+	esac
+done
+
+# After processing all options, find the requested operation and do
+# Default to build operation
+
+# Check if too many operation flags given
+total_ops=$((APPEND_FLAG + MERGE_FLAG + NEW_IMG_FLAG + CLEAN_FLAG))
+
+# Too many operation flags given
+if [[ $total_ops -gt 1 ]]; then
+	echo "Error: Too many operation flags!" >&2
+	exit 1
+# Append flag
+elif [[ ! -z $APPEND_FLAG ]]; then
+	folder=$(realpath -s -q "${1}")/
+	title=$2
+	append
+	exit
+# Image rebuild flag
+elif [[ ! -z $NEW_IMG_FLAG ]]; then
+	title=$1
+	rebuild_imgs
+	exit
+# Merge flag
+elif [[ ! -z $MERGE_FLAG ]]; then
+	merge
+	exit
+# Clean flag
+elif [[ ! -z $CLEAN_FLAG ]]; then
+	clean_list=$@
+	clean
+	exit
+# Build flag
+elif [[ $# -eq 2 ]]; then 
+	folder=$(realpath -s -q "${1}")/
+	title=$2
+	build
+elif [[ $# -lt 2 ]]; then
+	echo "Not enough args" >&2
+	exit 1
+else
+	echo "Too many args: $#" >&2
+	exit 1
+fi

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+build_menu "Detroit Metal City" dmc "Detroit Metal " "City"
+build_menu "Blend S" blend "Blend " "S"
+build_menu "Gochuumon Season 2" gochuu2 "Gochuumon ha " "Usagi desu ka??"
+build_menu "Gochuumon wa Usagi desu Ka?" gochuu "Gochuumon wa " "Usagi desu ka?"
+build_menu "Konohana Kitan" konohana "Konohana " "Kitan"
+build_menu "Little witch academia" lwa "Little Witch " "Academia"
+build_menu "princess principal" pripal "Princess " "Principal"
+build_menu "Hibike Euphonium S2" hibike2 "Hibike! " "Euphonium S2"
+build_menu "Hibike Euphonium" hibike "Hibike! " "Euphonium"
+build_menu "Love Live Sunshine S2" llsun2 "Love Live! " 'Sunshine!! S2' llsun2
+build_menu "Love Live Sunshine S1" llsun "Love Live! " 'Sunshine!!' llsun
+build_menu "K-On S2" kon2 "K-" 'On!!'
+build_menu "K-On" kon "K-" "On!"
+build_menu "Flip Flappers" flipflap "Flip " "Flappers"
+build_menu "Girls und Panzer" panzer "Girls " "und Panzer"
+build_menu 'New Game!!' newgame2 "New " 'Game!!'
+build_menu "New Game" newgame "New " "Game!"
+build_menu "Tamako Market" tamako "Tamako " "Market"
+build_menu "Kobayashi dragon maid" maiddragon "Kobayashi-san Chi no " "Maid Dragon"
+build_menu "Eromanga sensei" eromanga "Eromanga " "Sensei"
+build_menu "Non non biyori repeat" nnb2 "Non Non " "Biyori Repeat"
+build_menu "Non non biyori" nnb "Non Non " "Biyori"
+build_menu "Yuru Yuri S3" yuruyuri3 "Yuru Yuri " "San☆Hai!"
+build_menu "Yuru Yuri Nachuyachumi plus" yuruyuriova2 "Yuru " "Yuri OVA+"
+#build_menu "Yuru Yuri Nachuyachumi" yuruyuriova "Yuru " "Yuri OVA"
+build_menu "Yuru Yuri S2" yuruyuri2 "Yuru " "Yuri♪♪"
+build_menu "Yuru Yuri" yuruyuri "Yuru " "Yuri"
